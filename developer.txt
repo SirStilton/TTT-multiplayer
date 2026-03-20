@@ -1,0 +1,12 @@
+Single Player:
+etsy-com.neocities.org/ttt_simple --> simple
+etsy-com.neocities.org/ttt_ultimate --> ultimate
+etsy-com.neocities.org/ttt_tripple --> tripple
+Multiplayer:
+https://ttt-multiplayer-6x1d.onrender.com/ --> simple
+https://ttt-multiplayer-6x1d.onrender.com/ultimate --> ultimate
+https://ttt-multiplayer-6x1d.onrender.com/triple --> tripple
+Ai:
+etsy-com.neocities.org/ttt_simple_ai --> simple
+etsy-com.neocities.org/ttt_ultimate_ai --> ultimate
+etsy-com.neocities.org/ttt_tripple_ai --> tripple
