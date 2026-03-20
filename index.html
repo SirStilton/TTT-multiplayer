@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tic Tac Toe · Multiplayer</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #06060c;
+  --x: #ff3355; --o: #00e5ff;
+  --xg: #ff335540; --og: #00e5ff40;
+  --text: #dde4f0; --muted: #445566;
+  --warn: #ffcc00;
+  --l1b: #2a3a55; --l1bg: #0d0d1a;
+  --line: #1e2a44;
+  --green: #00ff88; --greeng: #00ff8820;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg); color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 20px; user-select: none;
+}
+body::after {
+  content: ''; position: fixed; inset: 0;
+  background: repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.04) 3px,rgba(0,0,0,0.04) 4px);
+  pointer-events: none; z-index: 999;
+}
+
+/* ── SCREENS ── */
+.screen {
+  position: relative; z-index: 1;
+  display: flex; flex-direction: column;
+  align-items: center; gap: 22px;
+  width: 100%; max-width: 400px;
+}
+.screen.hidden { display: none !important; }
+
+/* Header */
+header { text-align: center; }
+h1 {
+  font-family: 'Orbitron', sans-serif; font-weight: 900;
+  font-size: clamp(18px, 5vw, 30px);
+  letter-spacing: 0.14em; text-transform: uppercase;
+  background: linear-gradient(90deg, var(--x), #ff9999, var(--o));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; filter: drop-shadow(0 0 12px #ff335555);
+}
+.sub { font-size: 9px; color: var(--muted); letter-spacing: 0.25em; text-transform: uppercase; margin-top: 4px; }
+
+/* Card */
+.card {
+  width: 100%; background: var(--l1bg);
+  border: 1px solid var(--l1b); border-radius: 10px;
+  padding: 20px; display: flex; flex-direction: column; gap: 14px;
+}
+.card-label {
+  font-size: 9px; color: var(--muted);
+  letter-spacing: 0.18em; text-transform: uppercase;
+}
+
+/* Room code */
+.code-box {
+  display: flex; align-items: center; justify-content: space-between;
+  background: #040408; border: 1px solid var(--l1b);
+  border-radius: 6px; padding: 12px 16px;
+}
+.code-big {
+  font-family: 'Orbitron', sans-serif; font-weight: 900;
+  font-size: clamp(24px, 8vw, 40px);
+  letter-spacing: 0.35em; color: var(--warn);
+  text-shadow: 0 0 24px #ffcc0055;
+}
+.copy-btn {
+  background: transparent; border: 1px solid var(--l1b);
+  color: var(--muted); font-family: 'Share Tech Mono', monospace;
+  font-size: 10px; padding: 5px 10px; border-radius: 4px;
+  cursor: pointer; transition: all 0.2s; letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+.copy-btn:hover { color: var(--text); border-color: #4a5a70; }
+.copy-btn.ok { color: var(--green); border-color: var(--green); }
+
+/* Player slots */
+.slots { display: flex; gap: 8px; }
+.slot {
+  flex: 1; display: flex; align-items: center; gap: 8px;
+  background: #040408; border: 1px solid var(--l1b);
+  border-radius: 6px; padding: 8px 12px; font-size: 10px;
+  transition: border-color 0.3s;
+}
+.slot.filled-x { border-color: #ff335544; }
+.slot.filled-o { border-color: #00e5ff44; }
+.dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--l1b); flex-shrink: 0;
+  transition: background 0.4s, box-shadow 0.4s;
+}
+.dot.x { background: var(--x); box-shadow: 0 0 8px var(--x); }
+.dot.o { background: var(--o); box-shadow: 0 0 8px var(--o); }
+
+/* Input */
+input {
+  width: 100%; background: #040408;
+  border: 1px solid var(--l1b); color: var(--text);
+  font-family: 'Orbitron', sans-serif; font-weight: 700;
+  font-size: clamp(18px, 6vw, 28px);
+  letter-spacing: 0.35em; text-align: center; text-transform: uppercase;
+  padding: 12px 16px; border-radius: 6px;
+  outline: none; transition: border-color 0.2s;
+}
+input:focus { border-color: var(--warn); }
+input::placeholder { color: var(--l1b); letter-spacing: 0.2em; font-size: 14px; }
+
+.input-row { display: flex; gap: 8px; }
+.input-row input { flex: 1; }
+
+/* Error */
+.err {
+  font-size: 10px; color: var(--x);
+  letter-spacing: 0.08em; text-align: center;
+  min-height: 14px;
+}
+
+/* Waiting */
+.waiting-row {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 10px; color: var(--muted); letter-spacing: 0.1em;
+}
+.spinner {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid var(--l1b); border-top-color: var(--warn);
+  animation: spin 0.8s linear infinite; flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Buttons */
+.btn {
+  background: var(--l1bg); border: 1.5px solid var(--l1b);
+  color: var(--text); font-family: 'Share Tech Mono', monospace;
+  font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 11px 20px; border-radius: 6px;
+  cursor: pointer; transition: all 0.2s; white-space: nowrap;
+}
+.btn:hover:not(:disabled) { background: var(--l1b); transform: translateY(-1px); }
+.btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.btn-p {
+  background: linear-gradient(135deg, var(--x), var(--o));
+  border-color: transparent; color: #06060c; font-weight: 700;
+}
+.btn-p:hover:not(:disabled) { opacity: 0.9; transform: translateY(-2px); }
+.btn-green {
+  background: var(--greeng); border-color: var(--green);
+  color: var(--green); font-weight: 700;
+}
+
+/* Divider */
+.or {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 9px; color: var(--muted); letter-spacing: 0.15em;
+}
+.or::before, .or::after {
+  content: ''; flex: 1; height: 1px; background: var(--l1b);
+}
+
+/* ── GAME SCREEN ── */
+.hud {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  background: var(--l1bg); border: 1px solid var(--l1b);
+  border-radius: 8px; padding: 11px 18px; gap: 10px;
+}
+.pill {
+  display: flex; align-items: center; gap: 9px;
+  font-family: 'Orbitron', sans-serif; font-size: 11px;
+  font-weight: 700; letter-spacing: 0.06em;
+}
+.psym {
+  width: 30px; height: 30px; border-radius: 5px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 900; transition: all 0.3s;
+}
+.psym.x { color: var(--x); background: var(--xg); box-shadow: 0 0 10px var(--xg); }
+.psym.o { color: var(--o); background: var(--og); box-shadow: 0 0 10px var(--og); }
+.hst { font-size: 10px; color: var(--muted); text-align: center; flex: 1; line-height: 1.5; }
+.hst .hl  { color: var(--text); font-weight: 700; }
+.hst .you { color: var(--green); font-weight: 700; }
+.hst .opp { color: var(--warn); }
+.scores { display: flex; flex-direction: column; gap: 1px; font-size: 10px; align-items: flex-end; }
+.scores .sx { color: var(--x); } .scores .so { color: var(--o); } .scores .sd { color: var(--muted); }
+
+/* My symbol badge */
+.my-badge {
+  width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;
+  background: var(--l1bg); border: 1px solid var(--l1b);
+  border-radius: 6px; padding: 8px 14px; font-size: 10px; color: var(--muted);
+  letter-spacing: 0.1em;
+}
+.my-badge .sym {
+  font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: 18px;
+}
+.my-badge .sym.x { color: var(--x); text-shadow: 0 0 10px var(--xg); }
+.my-badge .sym.o { color: var(--o); text-shadow: 0 0 10px var(--og); }
+
+/* Turn indicator */
+.turn-bar {
+  width: 100%; padding: 7px 14px; border-radius: 6px;
+  text-align: center; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+  transition: all 0.35s; border: 1px solid transparent;
+}
+.turn-bar.your-turn  { background: #ffcc000d; border-color: #ffcc0040; color: var(--warn); animation: pulse-bar 1.5s ease infinite; }
+.turn-bar.their-turn { background: transparent; border-color: var(--l1b); color: var(--muted); animation: none; }
+@keyframes pulse-bar { 0%,100%{border-color:#ffcc0030;}50%{border-color:#ffcc0080;} }
+
+/* Board */
+.board-wrap { position: relative; width: 100%; }
+.board {
+  width: 100%; aspect-ratio: 1;
+  display: grid; grid-template-columns: repeat(3,1fr); grid-template-rows: repeat(3,1fr);
+  background: var(--line); border: 2px solid var(--l1b);
+  border-radius: 12px; padding: 2px; overflow: hidden;
+  box-shadow: 0 0 40px #00000060;
+}
+.cell {
+  background: var(--l1bg);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-family: 'Orbitron', sans-serif; font-weight: 900;
+  font-size: clamp(28px, 10vw, 72px);
+  transition: background 0.15s, transform 0.1s;
+  position: relative; overflow: hidden;
+  margin: 2px; border-radius: 6px;
+}
+.cell:hover:not(.taken):not(.disabled) { background: #131828; transform: scale(1.04); z-index: 1; }
+.cell.taken   { cursor: default; }
+.cell.disabled { cursor: not-allowed; }
+.cell.x { color: var(--x); }
+.cell.o { color: var(--o); }
+.cell.x::after,.cell.o::after {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(circle, currentColor 0%, transparent 65%); opacity: 0.18;
+}
+.cell.win-x { background: #ff335514; box-shadow: inset 0 0 20px #ff335530; }
+.cell.win-o { background: #00e5ff14; box-shadow: inset 0 0 20px #00e5ff30; }
+
+@keyframes cpop {
+  0%   { transform: scale(0) rotate(-10deg); opacity: 0; }
+  65%  { transform: scale(1.15) rotate(2deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+.cell.pop { animation: cpop 0.28s cubic-bezier(0.34,1.56,0.64,1) both; }
+
+.win-canvas {
+  position: absolute; inset: 0; pointer-events: none; z-index: 10; border-radius: 12px;
+}
+
+/* Rematch vote banner */
+.vote-banner {
+  width: 100%; padding: 10px 16px; border-radius: 6px;
+  background: var(--greeng); border: 1px solid var(--green);
+  color: var(--green); font-size: 10px; letter-spacing: 0.1em;
+  text-align: center; display: none;
+}
+.vote-banner.on { display: block; }
+
+/* Game Over */
+.gameover {
+  position: fixed; inset: 0; background: #06060cee;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.4s;
+}
+.gameover.on { opacity: 1; pointer-events: all; }
+.go-inner { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.go-sym {
+  font-family: 'Orbitron', sans-serif; font-weight: 900;
+  font-size: clamp(60px,20vw,120px); line-height: 1;
+  animation: gopop 0.5s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+.go-sym.x { color: var(--x); text-shadow: 0 0 60px var(--xg); }
+.go-sym.o { color: var(--o); text-shadow: 0 0 60px var(--og); }
+.go-sym.draw { color: var(--muted); font-size: clamp(36px,12vw,72px); }
+.go-title { font-family: 'Orbitron', sans-serif; font-weight: 700; font-size: clamp(14px,4vw,22px); letter-spacing: 0.12em; text-transform: uppercase; }
+.go-sub { font-size: 10px; color: var(--muted); letter-spacing: 0.2em; text-transform: uppercase; }
+@keyframes gopop { from{transform:scale(0.3) rotate(-15deg);opacity:0;}to{transform:scale(1) rotate(0);opacity:1;} }
+
+/* Disconnected banner */
+.disconnect-banner {
+  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+  background: #3a0808; border: 1px solid var(--x);
+  color: var(--x); font-size: 10px; letter-spacing: 0.12em;
+  padding: 10px 20px; border-radius: 6px; z-index: 500;
+  display: none; white-space: nowrap;
+}
+.disconnect-banner.on { display: block; }
+
+/* Confetti */
+.cp { position:fixed;width:8px;height:8px;top:-10px;border-radius:2px;pointer-events:none;z-index:300;animation:cfall linear forwards; }
+@keyframes cfall { to{transform:translateY(110vh) rotate(720deg);opacity:0;} }
+</style>
+</head>
+<body>
+
+<!-- ── LOBBY SCREEN ── -->
+<div class="screen" id="screen-lobby">
+  <header>
+    <h1>Tic Tac Toe</h1>
+    <div class="sub">Online Multiplayer</div>
+  </header>
+
+  <!-- Create room -->
+  <div class="card" id="create-card">
+    <div class="card-label">Neues Spiel erstellen</div>
+    <div class="code-box">
+      <div class="code-big" id="my-code">----</div>
+      <button class="copy-btn" id="copy-btn" onclick="copyCode()">📋 Kopieren</button>
+    </div>
+    <div class="slots">
+      <div class="slot" id="slot-x"><div class="dot" id="dot-x"></div><span id="slot-x-label">Warte auf Spieler X…</span></div>
+      <div class="slot" id="slot-o"><div class="dot" id="dot-o"></div><span id="slot-o-label">Warte auf Spieler O…</span></div>
+    </div>
+    <div class="waiting-row" id="create-waiting" style="display:none">
+      <div class="spinner"></div><span>Warte auf Mitspieler…</span>
+    </div>
+    <div class="err" id="create-err"></div>
+  </div>
+
+  <div class="or">oder</div>
+
+  <!-- Join room -->
+  <div class="card">
+    <div class="card-label">Raum beitreten</div>
+    <div class="input-row">
+      <input type="text" id="join-input" maxlength="4" placeholder="CODE" oninput="this.value=this.value.toUpperCase()">
+      <button class="btn btn-p" onclick="joinRoom()">Beitreten</button>
+    </div>
+    <div class="err" id="join-err"></div>
+  </div>
+</div>
+
+<!-- ── GAME SCREEN ── -->
+<div class="screen hidden" id="screen-game">
+  <header>
+    <h1>Tic Tac Toe</h1>
+    <div class="sub" id="room-label">Raum ----</div>
+  </header>
+
+  <div class="my-badge">
+    <span>Du spielst als</span>
+    <span class="sym" id="my-sym">X</span>
+  </div>
+
+  <div class="hud">
+    <div class="pill">
+      <div class="psym x" id="psym">X</div>
+      <div id="plabel">Spieler X</div>
+    </div>
+    <div class="hst" id="hst">Verbinde…</div>
+    <div class="scores">
+      <div><span class="sx">X</span> <span id="sx">0</span></div>
+      <div><span class="so">O</span> <span id="so">0</span></div>
+      <div><span class="sd">—</span> <span id="sd">0</span></div>
+    </div>
+  </div>
+
+  <div class="turn-bar their-turn" id="turn-bar">Warte auf Gegner…</div>
+
+  <div class="board-wrap">
+    <div class="board" id="board"></div>
+    <canvas class="win-canvas" id="win-canvas"></canvas>
+  </div>
+
+  <div class="vote-banner" id="vote-banner"></div>
+
+  <div style="display:flex;gap:10px;width:100%;justify-content:flex-end;">
+    <button class="btn btn-green" onclick="requestRematch()" id="rematch-btn" style="display:none">↺ Rematch</button>
+    <button class="btn" onclick="leaveGame()">✕ Verlassen</button>
+  </div>
+</div>
+
+<!-- Game Over -->
+<div class="gameover" id="gameover">
+  <div class="go-inner">
+    <div class="go-sym" id="go-sym"></div>
+    <div class="go-title" id="go-title"></div>
+    <div class="go-sub"  id="go-sub"></div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="btn btn-green" onclick="requestRematch()" id="go-rematch-btn">↺ Rematch</button>
+      <button class="btn" onclick="document.getElementById('gameover').classList.remove('on')">Ansehen</button>
+    </div>
+  </div>
+</div>
+
+<div class="disconnect-banner" id="disc-banner">⚠ Gegner hat das Spiel verlassen</div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────────────
+// In production this is the Render URL; in dev it's localhost.
+// After deploying to Render, replace the URL below with your Render service URL.
+const WS_URL = (() => {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${proto}//${location.host}`;
+})();
+
+// ── STATE ────────────────────────────────────────────────────────
+var ws = null;
+var mySymbol = null;   // 'X' or 'O'
+var myCode = null;
+var gameOver = false;
+var cells = Array(9).fill(null);
+var currentPlayer = 'X';
+var scores = { X:0, O:0, D:0 };
+var rematchVoted = false;
+
+const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+
+// ── INIT ─────────────────────────────────────────────────────────
+function init() {
+  // Generate a random 4-letter room code
+  myCode = randomCode();
+  document.getElementById('my-code').textContent = myCode;
+  buildBoard();
+  connectAndCreate();
+}
+
+function randomCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from({length:4}, () => chars[Math.random()*chars.length|0]).join('');
+}
+
+// ── WEBSOCKET ────────────────────────────────────────────────────
+function connect(onOpen) {
+  ws = new WebSocket(WS_URL);
+
+  ws.onopen = () => onOpen();
+
+  ws.onmessage = e => {
+    let msg;
+    try { msg = JSON.parse(e.data); } catch { return; }
+    handleMessage(msg);
+  };
+
+  ws.onclose = () => {
+    document.getElementById('disc-banner').classList.add('on');
+  };
+
+  ws.onerror = () => {
+    document.getElementById('join-err').textContent = 'Verbindung fehlgeschlagen.';
+  };
+}
+
+function connectAndCreate() {
+  connect(() => {
+    ws.send(JSON.stringify({ type: 'join', code: myCode }));
+  });
+}
+
+function joinRoom() {
+  const code = document.getElementById('join-input').value.trim().toUpperCase();
+  if (code.length !== 4) {
+    document.getElementById('join-err').textContent = 'Bitte einen 4-stelligen Code eingeben.';
+    return;
+  }
+  document.getElementById('join-err').textContent = '';
+  connect(() => {
+    ws.send(JSON.stringify({ type: 'join', code }));
+  });
+}
+
+// ── MESSAGE HANDLER ──────────────────────────────────────────────
+function handleMessage(msg) {
+  switch (msg.type) {
+
+    case 'joined':
+      mySymbol = msg.symbol;
+      myCode = msg.code;
+      document.getElementById('room-label').textContent = `Raum ${msg.code}`;
+      document.getElementById('my-sym').textContent = mySymbol;
+      document.getElementById('my-sym').className = `sym ${mySymbol.toLowerCase()}`;
+
+      // Show which slot is filled
+      if (mySymbol === 'X') {
+        document.getElementById('dot-x').className = 'dot x';
+        document.getElementById('slot-x-label').textContent = 'Du (X)';
+        document.getElementById('slot-x').className = 'slot filled-x';
+        document.getElementById('create-waiting').style.display = 'flex';
+      } else {
+        document.getElementById('dot-o').className = 'dot o';
+        document.getElementById('slot-o-label').textContent = 'Du (O)';
+        document.getElementById('slot-o').className = 'slot filled-o';
+      }
+      break;
+
+    case 'waiting':
+      // Already handled by joined
+      break;
+
+    case 'error':
+      document.getElementById('join-err').textContent = msg.text;
+      document.getElementById('create-err').textContent = msg.text;
+      break;
+
+    case 'start':
+      cells = msg.cells;
+      currentPlayer = msg.currentPlayer;
+      scores = msg.scores;
+      gameOver = false;
+      rematchVoted = false;
+      document.getElementById('gameover').classList.remove('on');
+      document.getElementById('vote-banner').classList.remove('on');
+      document.getElementById('rematch-btn').style.display = 'none';
+      document.getElementById('go-rematch-btn').disabled = false;
+      showScreen('game');
+      renderBoard();
+      updateHUD();
+      clearCanvas();
+      break;
+
+    case 'update':
+      cells = msg.cells;
+      currentPlayer = msg.currentPlayer;
+      scores = msg.scores;
+      renderBoard();
+      updateHUD();
+
+      if (msg.result) {
+        gameOver = true;
+        const { winner, line } = msg.result;
+        if (line) highlightWin(winner, line);
+        setTimeout(() => showGameOver(winner), line ? 600 : 300);
+      }
+      break;
+
+    case 'rematch_vote':
+      document.getElementById('vote-banner').textContent =
+        `Spieler ${msg.from} möchte ein Rematch…`;
+      document.getElementById('vote-banner').classList.add('on');
+      break;
+
+    case 'opponent_left':
+      document.getElementById('disc-banner').classList.add('on');
+      gameOver = true;
+      updateHUD();
+      break;
+  }
+}
+
+// ── BOARD ────────────────────────────────────────────────────────
+function buildBoard() {
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+  for (let i = 0; i < 9; i++) {
+    const c = document.createElement('div');
+    c.className = 'cell';
+    c.dataset.i = i;
+    c.addEventListener('click', () => handleClick(i));
+    board.appendChild(c);
+  }
+  resizeCanvas();
+}
+
+function resizeCanvas() {
+  const board = document.getElementById('board');
+  const canvas = document.getElementById('win-canvas');
+  const r = board.getBoundingClientRect();
+  canvas.width = r.width || 300;
+  canvas.height = r.height || 300;
+}
+
+function renderBoard() {
+  clearCanvas();
+  for (let i = 0; i < 9; i++) {
+    const el = document.querySelector(`.cell[data-i="${i}"]`);
+    if (!el) continue;
+    const v = cells[i];
+    el.className = 'cell' + (v ? ` taken ${v.toLowerCase()}` : '');
+    el.textContent = v || '';
+
+    // disable if not my turn or game over
+    const myTurn = !gameOver && currentPlayer === mySymbol;
+    if (!v && !myTurn) el.classList.add('disabled');
+  }
+}
+
+function handleClick(i) {
+  if (gameOver) return;
+  if (cells[i]) return;
+  if (currentPlayer !== mySymbol) return;
+  ws.send(JSON.stringify({ type: 'move', index: i }));
+
+  // Optimistic: show pop immediately
+  const el = document.querySelector(`.cell[data-i="${i}"]`);
+  if (el) { el.textContent = mySymbol; el.classList.add(mySymbol.toLowerCase(), 'taken', 'pop'); setTimeout(()=>el.classList.remove('pop'),400); }
+}
+
+// ── WIN LINE ─────────────────────────────────────────────────────
+function highlightWin(winner, line) {
+  if (!line) return;
+  line.forEach(i => {
+    const el = document.querySelector(`.cell[data-i="${i}"]`);
+    if (el) el.classList.add(`win-${winner.toLowerCase()}`);
+  });
+
+  const canvas = document.getElementById('win-canvas');
+  resizeCanvas();
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  const cw = w/3, ch = h/3;
+
+  function center(idx) {
+    return { x: (idx%3)*cw + cw/2, y: Math.floor(idx/3)*ch + ch/2 };
+  }
+
+  const p1 = center(line[0]), p2 = center(line[2]);
+  const dx = p2.x-p1.x, dy = p2.y-p1.y;
+  const len = Math.sqrt(dx*dx+dy*dy);
+  const ext = 18;
+  const sx = p1.x-(dx/len)*ext, sy = p1.y-(dy/len)*ext;
+  const ex = p2.x+(dx/len)*ext, ey = p2.y+(dy/len)*ext;
+  const color = winner==='X'?'#ff3355':'#00e5ff';
+
+  let start = null;
+  function draw(now) {
+    if (!start) start = now;
+    const t = Math.min((now-start)/400,1);
+    const ease = 1-Math.pow(1-t,3);
+    ctx.clearRect(0,0,w,h);
+    ctx.save();
+    ctx.strokeStyle = winner==='X'?'#ff335566':'#00e5ff66';
+    ctx.lineWidth=10; ctx.lineCap='round';
+    ctx.shadowColor=color; ctx.shadowBlur=20;
+    ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(sx+(ex-sx)*ease,sy+(ey-sy)*ease); ctx.stroke();
+    ctx.restore();
+    ctx.save();
+    ctx.strokeStyle=color; ctx.lineWidth=4; ctx.lineCap='round';
+    ctx.shadowColor=color; ctx.shadowBlur=8;
+    ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(sx+(ex-sx)*ease,sy+(ey-sy)*ease); ctx.stroke();
+    ctx.restore();
+    if(t<1) requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+}
+
+function clearCanvas() {
+  const canvas = document.getElementById('win-canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+}
+
+// ── HUD ──────────────────────────────────────────────────────────
+function updateHUD() {
+  document.getElementById('sx').textContent = scores.X;
+  document.getElementById('so').textContent = scores.O;
+  document.getElementById('sd').textContent = scores.D;
+
+  const psym   = document.getElementById('psym');
+  const plabel = document.getElementById('plabel');
+  const hst    = document.getElementById('hst');
+  const turnBar = document.getElementById('turn-bar');
+
+  if (gameOver) {
+    hst.innerHTML = '';
+    turnBar.className = 'turn-bar their-turn';
+    turnBar.textContent = 'Runde beendet';
+    document.getElementById('rematch-btn').style.display = 'inline-block';
+    return;
+  }
+
+  psym.textContent = currentPlayer;
+  psym.className = `psym ${currentPlayer.toLowerCase()}`;
+
+  const isMyTurn = currentPlayer === mySymbol;
+  plabel.textContent = isMyTurn ? 'Du bist dran' : 'Gegner ist dran';
+
+  if (isMyTurn) {
+    hst.innerHTML = `<span class="you">Dein Zug!</span>`;
+    turnBar.className = 'turn-bar your-turn';
+    turnBar.textContent = '⚡ Dein Zug';
+  } else {
+    hst.innerHTML = `<span class="opp">Gegner denkt…</span>`;
+    turnBar.className = 'turn-bar their-turn';
+    turnBar.textContent = 'Warte auf Gegner…';
+  }
+}
+
+// ── GAME OVER ────────────────────────────────────────────────────
+function showGameOver(winner) {
+  const sym   = document.getElementById('go-sym');
+  const title = document.getElementById('go-title');
+  const sub   = document.getElementById('go-sub');
+
+  if (winner === 'draw') {
+    sym.textContent = '—'; sym.className = 'go-sym draw';
+    title.textContent = 'Unentschieden';
+    sub.textContent = 'Gleichstand!';
+  } else {
+    const isMe = winner === mySymbol;
+    sym.textContent = winner; sym.className = `go-sym ${winner.toLowerCase()}`;
+    title.textContent = isMe ? 'Du gewinnst! 🎉' : 'Gegner gewinnt';
+    sub.textContent = isMe ? '— gut gespielt! —' : '— nächstes Mal klappt es! —';
+    if (isMe) confetti(winner);
+  }
+
+  document.getElementById('gameover').classList.add('on');
+}
+
+// ── REMATCH ──────────────────────────────────────────────────────
+function requestRematch() {
+  if (rematchVoted) return;
+  rematchVoted = true;
+  document.getElementById('go-rematch-btn').disabled = true;
+  document.getElementById('go-rematch-btn').textContent = '↺ Warte…';
+  document.getElementById('rematch-btn').textContent = '↺ Warte…';
+  ws.send(JSON.stringify({ type: 'rematch' }));
+}
+
+// ── COPY CODE ────────────────────────────────────────────────────
+function copyCode() {
+  navigator.clipboard.writeText(myCode).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = '✓ Kopiert!'; btn.classList.add('ok');
+    setTimeout(() => { btn.textContent = '📋 Kopieren'; btn.classList.remove('ok'); }, 2000);
+  });
+}
+
+// ── SCREENS ──────────────────────────────────────────────────────
+function showScreen(name) {
+  document.getElementById('screen-lobby').classList.toggle('hidden', name !== 'lobby');
+  document.getElementById('screen-game').classList.toggle('hidden', name !== 'game');
+  if (name === 'game') setTimeout(resizeCanvas, 100);
+}
+
+function leaveGame() {
+  if (ws) ws.close();
+  location.reload();
+}
+
+// ── CONFETTI ─────────────────────────────────────────────────────
+function confetti(w) {
+  const cols = w==='X'?['#ff3355','#ff7788','#ff0033','#ffaacc']:['#00e5ff','#55eeff','#00bbdd','#aaffff'];
+  for(let i=0;i<60;i++) setTimeout(()=>{
+    const e=document.createElement('div'); e.className='cp';
+    e.style.left=Math.random()*100+'vw';
+    e.style.background=cols[Math.random()*cols.length|0];
+    e.style.transform=`rotate(${Math.random()*360}deg)`;
+    e.style.animationDuration=(1.5+Math.random()*2)+'s';
+    document.body.appendChild(e); setTimeout(()=>e.remove(),4000);
+  },i*30);
+}
+
+window.addEventListener('resize', resizeCanvas);
+init();
+</script>
+</body>
+</html>
