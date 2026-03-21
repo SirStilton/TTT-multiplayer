@@ -1,0 +1,7 @@
+Funktioniert:
+Singleplayer;
+URLS siehe etsy-com.neocities.org/developer.txt
+VS KI;
+URLS siehe etsy-com.neocities.org/developer.txt
+Online Multiplayer mit Beitrittscode;
+URLS siehe etsy-com.neocities.org/developer.txt

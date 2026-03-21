@@ -1,0 +1,17 @@
+Funktioniert:
+Singleplayer;
+URLS siehe etsy-com.neocities.org/developer.txt
+VS KI;
+URLS siehe etsy-com.neocities.org/developer.txt
+Online Multiplayer mit Beitrittscode;
+URLS siehe etsy-com.neocities.org/developer.txt
+
+Funktioniert nicht:
+Onlien Multiplayer mit Random Gegner;
+Log: Found it. init() calls connectAndCreate() immediately on page load
+ — so ws is already set before the user clicks anything. 
+Then quickMatch() checks if (ws) return and exits immediately doing nothing.
+The fix: don't auto-connect on load. Instead connect only when the user clicks a button.
+Understand full init flowUnderstand full init flowThe problem is clear: 
+init() calls connectAndCreate() which sets ws immediately. 
+The fix is to lazy-connect — only connect when the user actually clicks "Erstellen", "Beitreten", or "Quick Match"

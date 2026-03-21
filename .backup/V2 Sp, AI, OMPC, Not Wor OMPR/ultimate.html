@@ -391,7 +391,6 @@ input::placeholder { color: var(--l1b); font-size: 13px; letter-spacing: 0.2em; 
       <div class="slot" id="slot-x"><div class="dot" id="dot-x"></div><span id="slot-x-lbl">Warte auf X…</span></div>
       <div class="slot" id="slot-o"><div class="dot" id="dot-o"></div><span id="slot-o-lbl">Warte auf O…</span></div>
     </div>
-    <button class="btn btn-p" id="create-btn" onclick="connectAndCreate()" style="width:100%">Spiel erstellen</button>
     <div class="waiting-row" id="create-waiting" style="display:none">
       <div class="spinner"></div><span>Warte auf Mitspieler…</span>
     </div>
@@ -466,8 +465,7 @@ input::placeholder { color: var(--l1b); font-size: 13px; letter-spacing: 0.2em; 
 var GAME_MODE = 'ultimate';
 var WS_URL = (function() {
   var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  var host = location.host || 'localhost:3000';
-  return proto + '//' + host;
+  return proto + '//' + location.host;
 })();
 
 // ── STATE ─────────────────────────────────────────────────────────
@@ -491,6 +489,7 @@ function init() {
   myCode = randomCode();
   document.getElementById('my-code').textContent = myCode;
   buildBoard();
+  connectAndCreate();
 }
 
 function randomCode() {
@@ -513,16 +512,12 @@ function connect(onOpen) {
 }
 
 function connectAndCreate() {
-  if (ws) return;
-  document.getElementById('create-btn').style.display = 'none';
-  document.getElementById('create-waiting').style.display = 'flex';
   connect(function() {
     ws.send(JSON.stringify({ type:'join', code:myCode, mode:'ultimate' }));
   });
 }
 
 function joinRoom() {
-  if (ws) { ws.close(); ws = null; }
   var code = document.getElementById('join-input').value.trim().toUpperCase();
   if (code.length !== 4) { document.getElementById('join-err').textContent = 'Bitte 4-stelligen Code eingeben.'; return; }
   document.getElementById('join-err').textContent = '';
@@ -846,7 +841,7 @@ function confetti(w) {
 
 // ── QUICK MATCH ───────────────────────────────────────────────────
 function quickMatch() {
-  if (ws) { ws.close(); ws = null; }
+  if (ws) return;
   document.getElementById('qm-btn').disabled = true;
   document.getElementById('qm-status').classList.add('on');
   document.getElementById('qm-cancel').classList.add('on');
