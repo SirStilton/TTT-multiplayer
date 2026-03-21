@@ -301,47 +301,6 @@ input::placeholder { color: var(--l1b); letter-spacing: 0.2em; font-size: 14px; 
 /* Confetti */
 .cp { position:fixed;width:8px;height:8px;top:-10px;border-radius:2px;pointer-events:none;z-index:300;animation:cfall linear forwards; }
 @keyframes cfall { to{transform:translateY(110vh) rotate(720deg);opacity:0;} }
-
-/* Quick Match */
-.qm-section {
-  width: 100%; max-width: 440px;
-  background: var(--l1bg); border: 1px solid var(--l1b);
-  border-radius: 10px; padding: 18px;
-  display: flex; flex-direction: column; gap: 12px;
-}
-.qm-title { font-size: 9px; color: var(--muted); letter-spacing: 0.18em; text-transform: uppercase; }
-.btn-qm {
-  width: 100%; padding: 14px; border-radius: 8px;
-  background: linear-gradient(135deg, #ff335520, #00e5ff20);
-  border: 1.5px solid #ffffff18; color: var(--text);
-  font-family: 'Share Tech Mono', monospace; font-size: 12px;
-  letter-spacing: 0.1em; text-transform: uppercase;
-  cursor: pointer; transition: all 0.2s;
-  display: flex; align-items: center; justify-content: center; gap: 10px;
-}
-.btn-qm:hover { background: linear-gradient(135deg, #ff335535, #00e5ff35); border-color: #ffffff30; transform: translateY(-1px); }
-.btn-qm:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
-.qm-status {
-  text-align: center; font-size: 10px; color: var(--muted);
-  letter-spacing: 0.08em; min-height: 16px; display: none;
-}
-.qm-status.on { display: block; }
-.qm-spinner { display: inline-flex; gap: 4px; align-items: center; margin-right: 8px; }
-.qm-dot {
-  width: 5px; height: 5px; border-radius: 50%; background: var(--green);
-  animation: qm-pulse 1.2s ease infinite;
-}
-.qm-dot:nth-child(2) { animation-delay: 0.2s; }
-.qm-dot:nth-child(3) { animation-delay: 0.4s; }
-@keyframes qm-pulse { 0%,100%{opacity:0.2;transform:scale(0.7);}50%{opacity:1;transform:scale(1.2);} }
-.btn-cancel-qm {
-  display: none; width: 100%; padding: 8px; border-radius: 6px;
-  background: transparent; border: 1px solid var(--l1b); color: var(--muted);
-  font-family: 'Share Tech Mono', monospace; font-size: 10px;
-  letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; transition: all 0.2s;
-}
-.btn-cancel-qm.on { display: block; }
-.btn-cancel-qm:hover { color: var(--text); border-color: #4a5a70; }
 </style>
 </head>
 <body>
@@ -354,20 +313,6 @@ input::placeholder { color: var(--l1b); letter-spacing: 0.2em; font-size: 14px; 
   </header>
 
   <!-- Create room -->
-  <div class="qm-section">
-    <div class="qm-title">⚡ Quick Match</div>
-    <button class="btn-qm" id="qm-btn" onclick="quickMatch()">
-      <span>🔍</span> Zufälligen Gegner suchen
-    </button>
-    <div class="qm-status" id="qm-status">
-      <span class="qm-spinner"><div class="qm-dot"></div><div class="qm-dot"></div><div class="qm-dot"></div></span>
-      Suche Gegner…
-    </div>
-    <button class="btn-cancel-qm" id="qm-cancel" onclick="cancelQueue()">✕ Abbrechen</button>
-  </div>
-
-  <div class="or" style="width:100%;max-width:440px">oder mit Code</div>
-
   <div class="card" id="create-card">
     <div class="card-label">Neues Spiel erstellen</div>
     <div class="code-box">
@@ -456,7 +401,6 @@ input::placeholder { color: var(--l1b); letter-spacing: 0.2em; font-size: 14px; 
 // ── CONFIG ──────────────────────────────────────────────────────
 // In production this is the Render URL; in dev it's localhost.
 // After deploying to Render, replace the URL below with your Render service URL.
-var GAME_MODE = 'normal';
 const WS_URL = (() => {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${proto}//${location.host}`;
@@ -534,14 +478,6 @@ function handleMessage(msg) {
     case 'joined':
       mySymbol = msg.symbol;
       myCode = msg.code;
-
-    // Show matchmade message if matched randomly
-    if (msg.matchmade) {
-      // show a brief "Match found!" flash
-      var qms = document.getElementById('qm-status');
-      if (qms) { qms.innerHTML = '✓ Gegner gefunden! Spiel startet…'; qms.classList.add('on'); }
-    }
-
       document.getElementById('room-label').textContent = `Raum ${msg.code}`;
       document.getElementById('my-sym').textContent = mySymbol;
       document.getElementById('my-sym').className = `sym ${mySymbol.toLowerCase()}`;
@@ -817,30 +753,6 @@ function confetti(w) {
 }
 
 window.addEventListener('resize', resizeCanvas);
-
-// ── QUICK MATCH ───────────────────────────────────────────────────
-function quickMatch() {
-  if (ws) return;
-  document.getElementById('qm-btn').disabled = true;
-  document.getElementById('qm-status').classList.add('on');
-  document.getElementById('qm-cancel').classList.add('on');
-
-  connect(function() {
-    ws.send(JSON.stringify({ type: 'quickmatch', mode: GAME_MODE }));
-  });
-}
-
-function cancelQueue() {
-  if (ws) {
-    ws.send(JSON.stringify({ type: 'cancel_queue' }));
-    ws.close();
-    ws = null;
-  }
-  document.getElementById('qm-btn').disabled = false;
-  document.getElementById('qm-status').classList.remove('on');
-  document.getElementById('qm-cancel').classList.remove('on');
-}
-
 init();
 </script>
 </body>

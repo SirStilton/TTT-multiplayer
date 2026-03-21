@@ -31,15 +31,12 @@ const httpServer = http.createServer((req, res) => {
 const wss = new WebSocket.Server({ server: httpServer });
 const rooms = {};
 
-// Matchmaking queues: one waiting player per mode
-// queues[mode] = ws | null
-const queues = { normal: null, ultimate: null, triple: null };
-
 const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
 
 function check9(cells) {
   for (const [a,b,c] of LINES)
-    if (cells[a] && cells[a]===cells[b] && cells[a]===cells[c]) return cells[a];
+    if (cells[a] && cells[a]===cells[b] && cells[a]===cells[c])
+      return cells[a];
   if (cells.every(v => v !== null)) return 'draw';
   return null;
 }
@@ -55,13 +52,6 @@ function send(ws, msg) {
 function clearTimers(room) {
   if (room.timers) Object.values(room.timers).forEach(t => clearTimeout(t));
   room.timers = {};
-}
-function randomCode() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = '';
-  for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
-  // make sure code is unique
-  return rooms[code] ? randomCode() : code;
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -135,8 +125,8 @@ function handleUltimateMove(room, ws, msg) {
 
   room.cells[boardIdx][cellIdx] = room.currentPlayer;
   const res = check9(room.cells[boardIdx]);
-  let replayBoard = null;
 
+  let replayBoard = null;
   if (res==='X'||res==='O') {
     room.boardWon[boardIdx] = res;
     room.boardReplaying[boardIdx] = false;
@@ -160,6 +150,7 @@ function handleUltimateMove(room, ws, msg) {
   }
 
   if (!room.over) room.currentPlayer = room.currentPlayer==='X'?'O':'X';
+
   broadcast(room, { type:'ultimate_update', ...snapUltimate(room), lastMove:{boardIdx,cellIdx} });
 
   if (replayBoard!==null) {
@@ -185,6 +176,13 @@ function resetUltimate(room) {
 
 // ══════════════════════════════════════════════════════════════════
 // TRIPLE TTT (3-level)
+//   cells[mg][md][mn]   = null|'X'|'O'
+//   l2won[mg][md]       = null|'X'|'O'   (mini board winner)
+//   l2rep[mg][md]       = bool
+//   l1won[mg]           = null|'X'|'O'   (mid board winner)
+//   l1rep[mg]           = bool
+//   lock                = null | { mg, md }  (md=-1 = free within mg)
+//   winner              = null|'X'|'O'|'draw'
 // ══════════════════════════════════════════════════════════════════
 function makeTriple() {
   return {
@@ -210,6 +208,7 @@ function snapTriple(r) {
 function handleTripleMove(room, ws, msg) {
   if (room.over || ws.symbol !== room.currentPlayer) return;
   const { mg, md, mn } = msg;
+
   if (room.l1won[mg]!==null) return;
   if (room.l2won[mg][md]!==null) return;
   if (room.cells[mg][md][mn]!==null) return;
@@ -219,17 +218,21 @@ function handleTripleMove(room, ws, msg) {
   }
 
   room.cells[mg][md][mn] = room.currentPlayer;
+
   const l2res = check9(room.cells[mg][md]);
   let replayKey = null;
 
   if (l2res==='X'||l2res==='O') {
-    room.l2won[mg][md] = l2res; room.l2rep[mg][md] = false;
+    room.l2won[mg][md] = l2res;
+    room.l2rep[mg][md] = false;
+
     const l1res = check9(room.l2won[mg]);
     if (l1res==='X'||l1res==='O') {
       room.l1won[mg]=l1res; room.l1rep[mg]=false; room.lock=null;
       const megaRes = check9(room.l1won);
-      if (megaRes==='X'||megaRes==='O') { room.winner=megaRes; room.scores[megaRes]++; room.over=true; }
-      else if (room.l1won.every(r=>r!==null)) {
+      if (megaRes==='X'||megaRes==='O') {
+        room.winner=megaRes; room.scores[megaRes]++; room.over=true;
+      } else if (room.l1won.every(r=>r!==null)) {
         const xs=room.l1won.filter(r=>r==='X').length, os=room.l1won.filter(r=>r==='O').length;
         room.winner=xs>os?'X':os>xs?'O':'draw';
         if (room.winner!=='draw') room.scores[room.winner]++;
@@ -237,12 +240,17 @@ function handleTripleMove(room, ws, msg) {
       }
     } else if (l1res==='draw') {
       room.l1rep[mg]=true; room.lock={mg,md:-1}; replayKey=`l1:${mg}`;
-    } else { room.lock={mg,md:-1}; }
+    } else {
+      room.lock={mg,md:-1};
+    }
   } else if (l2res==='draw') {
     room.l2rep[mg][md]=true; room.lock={mg,md}; replayKey=`l2:${mg}:${md}`;
-  } else { room.lock={mg,md}; }
+  } else {
+    room.lock={mg,md};
+  }
 
   if (!room.over) room.currentPlayer=room.currentPlayer==='X'?'O':'X';
+
   broadcast(room, { type:'triple_update', ...snapTriple(room), lastMove:{mg,md,mn} });
 
   if (replayKey!==null) {
@@ -253,7 +261,8 @@ function handleTripleMove(room, ws, msg) {
       if (level==='l2') {
         const [bmg,bmd] = parts.map(Number);
         room.cells[bmg][bmd]=Array(9).fill(null);
-        room.l2rep[bmg][bmd]=true; room.lock={mg:bmg,md:bmd};
+        room.l2rep[bmg][bmd]=true;
+        room.lock={mg:bmg,md:bmd};
         broadcast(room, { type:'triple_replay_wipe', level:'l2', mg:bmg, md:bmd, ...snapTriple(room) });
       } else {
         const bmg = Number(parts[0]);
@@ -277,98 +286,33 @@ function resetTriple(room) {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// MATCHMAKING
-// ══════════════════════════════════════════════════════════════════
-function tryMatch(ws, mode) {
-  const waiting = queues[mode];
-
-  // If someone is already waiting, match them
-  if (waiting && waiting.readyState === WebSocket.OPEN) {
-    queues[mode] = null;
-
-    const code = randomCode();
-    let room;
-    if (mode==='triple')        room = makeTriple();
-    else if (mode==='ultimate') room = makeUltimate();
-    else                        room = makeNormal();
-
-    rooms[code] = room;
-
-    // First player (was waiting) = X
-    waiting.roomCode = code; waiting.symbol = 'X'; waiting.inQueue = false;
-    room.players.push(waiting);
-    send(waiting, { type:'joined', symbol:'X', code, mode, matchmade:true });
-
-    // Second player (just joined) = O
-    ws.roomCode = code; ws.symbol = 'O'; ws.inQueue = false;
-    room.players.push(ws);
-    send(ws, { type:'joined', symbol:'O', code, mode, matchmade:true });
-
-    // Start!
-    if (mode==='triple')        broadcast(room, { type:'start', ...snapTriple(room) });
-    else if (mode==='ultimate') broadcast(room, { type:'start', ...snapUltimate(room) });
-    else broadcast(room, { type:'start', cells:room.cells, currentPlayer:room.currentPlayer, scores:room.scores });
-
-  } else {
-    // No one waiting — put this player in the queue
-    queues[mode] = ws;
-    ws.inQueue = true;
-    ws.queueMode = mode;
-    send(ws, { type:'queued', mode });
-  }
-}
-
-function removeFromQueue(ws) {
-  if (ws.inQueue && ws.queueMode) {
-    if (queues[ws.queueMode] === ws) {
-      queues[ws.queueMode] = null;
-    }
-    ws.inQueue = false;
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════
 // CONNECTION HANDLER
 // ══════════════════════════════════════════════════════════════════
 wss.on('connection', ws => {
   ws.roomCode = null;
   ws.symbol   = null;
-  ws.inQueue  = false;
-  ws.queueMode = null;
 
   ws.on('message', raw => {
     let msg; try { msg = JSON.parse(raw); } catch { return; }
 
-    // ── QUICK MATCH (matchmaking) ─────────────────────────────────
-    if (msg.type === 'quickmatch') {
-      const mode = ['normal','ultimate','triple'].includes(msg.mode) ? msg.mode : 'normal';
-      if (ws.roomCode || ws.inQueue) return; // already in a game/queue
-      tryMatch(ws, mode);
-    }
-
-    // ── CANCEL QUEUE ─────────────────────────────────────────────
-    else if (msg.type === 'cancel_queue') {
-      removeFromQueue(ws);
-      send(ws, { type:'queue_cancelled' });
-    }
-
-    // ── JOIN with room code ───────────────────────────────────────
-    else if (msg.type === 'join') {
+    // ── JOIN ──────────────────────────────────────────────────────
+    if (msg.type === 'join') {
       const code = (msg.code||'').toUpperCase().trim();
       const mode = ['normal','ultimate','triple'].includes(msg.mode) ? msg.mode : 'normal';
 
       if (!rooms[code]) {
-        if (mode==='triple')        rooms[code]=makeTriple();
+        if (mode==='triple')   rooms[code]=makeTriple();
         else if (mode==='ultimate') rooms[code]=makeUltimate();
-        else                        rooms[code]=makeNormal();
+        else rooms[code]=makeNormal();
       }
       const room = rooms[code];
       if (room.mode !== mode) { send(ws,{type:'error',text:'Falscher Spielmodus.'}); return; }
       if (room.players.length >= 2) { send(ws,{type:'error',text:'Raum ist voll!'}); return; }
 
-      ws.roomCode = code; ws.symbol = room.players.length===0 ? 'X' : 'O';
+      ws.roomCode = code;
+      ws.symbol   = room.players.length===0 ? 'X' : 'O';
       room.players.push(ws);
-      send(ws, { type:'joined', symbol:ws.symbol, code, mode, matchmade:false });
+      send(ws, { type:'joined', symbol:ws.symbol, code, mode });
 
       if (room.players.length===2) {
         if (mode==='triple')        broadcast(room,{type:'start',...snapTriple(room)});
@@ -412,9 +356,6 @@ wss.on('connection', ws => {
   });
 
   ws.on('close', () => {
-    // Remove from queue if they disconnect while waiting
-    removeFromQueue(ws);
-
     if (!ws.roomCode||!rooms[ws.roomCode]) return;
     broadcast(rooms[ws.roomCode],{type:'opponent_left'});
     setTimeout(()=>{
@@ -429,7 +370,7 @@ wss.on('connection', ws => {
 
 httpServer.listen(PORT, () => {
   console.log(`Server läuft auf Port ${PORT}`);
-  console.log(`  Normal TTT:   http://localhost:${PORT}/`);
+  console.log(`  Normal TTT:  http://localhost:${PORT}/`);
   console.log(`  Ultimate TTT: http://localhost:${PORT}/ultimate`);
   console.log(`  Triple TTT:   http://localhost:${PORT}/triple`);
 });
